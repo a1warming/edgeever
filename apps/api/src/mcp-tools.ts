@@ -178,7 +178,7 @@ const MCP_TOOL_DEFINITIONS = [
   },
   {
     name: "list_memos",
-    description: "List EdgeEver memos with pagination. Use poster=true to list only editable poster notes (海报笔记), false to exclude them. Use includeContent when full Markdown is needed.",
+    description: "List EdgeEver memos with pagination. Use poster=true to list only editable poster notes (海报笔记), false to exclude them. includeContent returns a byte-bounded first 1000-code-point preview per memo (up to 10 memos); follow per-memo nextOffsetChars with read_memo_page for the rest. Metadata pages may return fewer than limit; always follow nextOffset.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -194,7 +194,7 @@ const MCP_TOOL_DEFINITIONS = [
   },
   {
     name: "get_memo",
-    description: "Read a memo with Markdown content.",
+    description: "Read a byte-bounded Markdown page (default 8000, max 12000 Unicode code points). Never assume full content: follow memo.hasMore / nextOffsetChars using read_memo_page and expectedRevision. markdownSha256 covers the full Markdown. Conflicting revisions fail; restart from zero. REST/Web details are unaffected.",
     inputSchema: {
       type: "object",
       required: ["memoId"],
@@ -202,6 +202,25 @@ const MCP_TOOL_DEFINITIONS = [
       properties: {
         memoId: { type: "string" },
         includeDeleted: { type: "boolean" },
+        offsetChars: { type: "integer", minimum: 0, description: "Unicode code-point offset; use nextOffsetChars verbatim." },
+        maxChars: { type: "integer", minimum: 1, maximum: 12000 },
+        expectedRevision: { type: "integer", minimum: 0 },
+      },
+    },
+  },
+  {
+    name: "read_memo_page",
+    description: "Read a byte-bounded Markdown page (default 8000, max 12000 Unicode code points). Never assume full content: follow memo.hasMore / nextOffsetChars using read_memo_page and expectedRevision. markdownSha256 covers the full Markdown. Conflicting revisions fail; restart from zero. REST/Web details are unaffected.",
+    inputSchema: {
+      type: "object",
+      required: ["memoId"],
+      additionalProperties: false,
+      properties: {
+        memoId: { type: "string" },
+        includeDeleted: { type: "boolean" },
+        offsetChars: { type: "integer", minimum: 0, description: "Unicode code-point offset; use nextOffsetChars verbatim." },
+        maxChars: { type: "integer", minimum: 1, maximum: 12000 },
+        expectedRevision: { type: "integer", minimum: 0 },
       },
     },
   },
@@ -1052,6 +1071,7 @@ const READ_ONLY_MCP_TOOLS = new Set([
   "search_memos",
   "list_memos",
   "get_memo",
+  "read_memo_page",
   "get_table_records",
   "get_diagram",
   "get_poster",

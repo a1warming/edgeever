@@ -300,13 +300,14 @@ export const callMcpTool = async (
       return await listMemosForMcp(c.env.storage.db, {
         workspaceId: auth.workspaceId,
         notebookId: getOptionalString(args.notebookId),
-        limit: clampNumber(Number(args.limit ?? 50), 1, 100),
+        limit: clampNumber(Number(args.limit ?? 50), 1, args.includeContent === true ? 10 : 100),
         offset: clampNumber(Number(args.offset ?? 0), 0, 100_000),
         includeContent: args.includeContent === true,
         includeDeleted: args.includeDeleted === true,
         poster: typeof args.poster === "boolean" ? args.poster : null,
       });
     }
+    case "read_memo_page":
     case "get_memo": {
       assertScope(auth, "read:memos");
       const memoId = getRequiredString(args.memoId, "memoId");

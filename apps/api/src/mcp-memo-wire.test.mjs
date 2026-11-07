@@ -1,0 +1,11 @@
+import {expect,test} from "bun:test";
+import {Hono} from "hono";
+import {registerMcpRoutes} from "./mcp-routes.ts";
+const auth={kind:"agent",scopes:["read:memos"],workspaceId:"ws",role:"owner"};
+const body="中文😀\u0000\n\\\"".repeat(9000);
+const source={id:"memo_x",revision:7,title:"wire",contentMarkdown:body,contentJson:{text:body.repeat(3)},contentText:body};
+function app(){const app=new Hono();registerMcpRoutes(app,{authenticateRequest:async()=>auth,callTool:async()=>({memo:source})});return app;}
+async function call(name,args){return app().request("/mcp",{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json, text/event-stream"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"tools/call",params:{name,arguments:args}})});}
+test("real MCP route compact content and structured fit independently and all pages recover exact bytes",async()=>{let offset=0,text="",n=0;do{const response=await call("read_memo_page",{memoId:"memo_x",maxChars:12000,offsetChars:offset,expectedRevision:7});const wire=await response.text();expect(Buffer.byteLength(wire)).toBeLessThan(200000);const result=JSON.parse(wire).result;expect(result.isError).toBe(false);expect(Buffer.byteLength(result.content[0].text)).toBeLessThan(65536);expect(Buffer.byteLength(JSON.stringify(result.structuredContent))).toBeLessThan(65536);expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);text+=result.structuredContent.memo.contentMarkdown;offset=result.structuredContent.memo.nextOffsetChars;n++;}while(offset!==null);expect(text).toBe(body);expect(n).toBeGreaterThan(1);});
+test("old get_memo schema invocation explicitly returns first page, stale revision fails",async()=>{const result=(await(await call("get_memo",{memoId:"memo_x"})).json()).result;expect(result.structuredContent.memo.hasMore).toBe(true);const stale=(await(await call("read_memo_page",{memoId:"memo_x",expectedRevision:6})).json()).result;expect(stale.isError).toBe(true);expect(stale.structuredContent.error.code).toBe("revision_conflict");});
+test("update receipt does not return the saved body",async()=>{const r=(await(await call("update_memo",{memoId:"memo_x"})).json()).result;expect(r.structuredContent.updated).toBe(true);expect(r.structuredContent.memo.revision).toBe(7);expect(r.structuredContent.memo.contentMarkdown).toBeUndefined();});

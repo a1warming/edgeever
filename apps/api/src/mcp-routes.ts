@@ -11,6 +11,7 @@ import {
   type JsonRpcHandlerResult,
   type JsonRpcRequest,
 } from "./mcp-json-rpc";
+import { COMPACT_MEMO_TOOLS, projectMcpMemoOutput } from "./mcp-memo-output";
 import { MCP_TOOLS } from "./mcp-tools";
 import { posterToolImage } from "./poster-tool-output";
 
@@ -254,11 +255,13 @@ export const handleMcpMessage = async (
     }
 
     try {
-      const result = await dependencies.callTool(context, auth, name, asRecord(params.arguments));
+      const arguments_ = asRecord(params.arguments);
+      const rawResult = await dependencies.callTool(context, auth, name, arguments_);
+      const result = await projectMcpMemoOutput(name, rawResult, arguments_);
       const visual = posterToolImage(name, result);
       const toolResult = {
         content: [
-          { type: "text", text: JSON.stringify(visual?.metadata ?? result, null, 2) },
+          { type: "text", text: JSON.stringify(visual?.metadata ?? result, null, COMPACT_MEMO_TOOLS.has(name) ? undefined : 2) },
           ...(visual ? [{ type: "image", ...visual.image }] : []),
         ],
         structuredContent: visual?.metadata ?? result,
